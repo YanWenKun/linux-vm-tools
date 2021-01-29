@@ -1,25 +1,19 @@
 #!/bin/bash
 
 #
-# This script is for Arch Linux to configure XRDP for enhanced session mode
+# This script is for Fedora Linux to configure XRDP for enhanced session mode
 #
-# The configuration is adapted from the Ubuntu 16.04 script.
+# The configuration is adapted from the Arch script.
 #
 
 if [ "$(id -u)" -ne 0 ]; then
-    #rerun the script with root privileges
-    exec sudo "$0" "$@"
-fi
-
-# Use Qi to check for exact package name
-if ! pacman -Qi xrdp > /dev/null ; then
-    echo 'xrdp not installed. Run makepkg.sh first to install xrdp.' >&2
+    echo 'This script must be run with root privileges' >&2
     exit 1
 fi
 
-# Use Qs to allow xorgxrdp-devel-git
-if ! pacman -Qs xorgxrdp > /dev/null ; then
-    echo 'xorgxrdp not installed. Run makepkg.sh first to install xorgxrdp.' >&2
+# Use rpm -q to check for exact package name
+if ! rpm -q xrdp 2>&1 > /dev/null ; then
+    echo 'xrdp not installed. Run dnf install xrdp first to install xrdp.' >&2
     exit 1
 fi
 
@@ -71,18 +65,17 @@ polkit.addRule(function(action, subject) {
 });
 EOF
 
-# Adapt the xrdp pam config
-cat > /etc/pam.d/xrdp-sesman <<EOF
-#%PAM-1.0
-auth        include     system-remote-login
-account     include     system-remote-login
-password    include     system-remote-login
-session     include     system-remote-login
-EOF
-
+# Compile selinux module!
+checkmodule -M -m -o allow-vsock.mod allow-vsock.te
+semodule_package -o allow-vsock.pp -m allow-vsock.mod
+# Install the selinux module!
+semodule -i allow-vsock.pp
 
 ###############################################################################
-# .xinitrc has to be modified manually.
-#
-echo "You will have to configure .xinitrc to start your windows manager, see https://wiki.archlinux.org/index.php/Xinit"
-echo "Reboot your machine to begin using XRDP."
+
+echo "####### Configuration Done #######"
+echo "Next to do"
+echo "Shutdown this VM"
+echo "On your host machine in an Administrator powershell prompt, execute this command: "
+echo "             Set-VM -VMName <your_vm_name> -EnhancedSessionTransportType HvSocket"
+echo "Start this VM, and you will see Enhanced mode available!"

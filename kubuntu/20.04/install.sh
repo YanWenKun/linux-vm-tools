@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# This script is for Ubuntu 18.04 Bionic Beaver to download and install XRDP+XORGXRDP via
+# This script is for Kubuntu 20.04 Focal Fossa to download and install XRDP+XORGXRDP via
 # source.
 #
 # Major thanks to: http://c-nergy.be/blog/?p=11336 for the tips.
@@ -11,7 +11,7 @@
 # Use HWE kernel packages
 #
 HWE=""
-#HWE="-hwe-18.04"
+#HWE="-hwe-20.04"
 
 ###############################################################################
 # Update our machine to the latest code if we need to.
@@ -39,14 +39,14 @@ apt install -y linux-tools-virtual${HWE}
 apt install -y linux-cloud-tools-virtual${HWE}
 
 # Install the xrdp service so we have the auto start behavior
-apt install -y xrdp xserver-xorg-core xorgxrdp
+apt install -y xrdp
 
 systemctl stop xrdp
 systemctl stop xrdp-sesman
 
 # Configure the installed XRDP ini files.
-# use vsock transport.
-sed -i_orig -e 's/use_vsock=false/use_vsock=true/g' /etc/xrdp/xrdp.ini
+# do not use vsock transport since newer versions of xrdp do not support it.
+sed -i_orig -e 's/port=3389/port=vsock:\/\/-1:3389/g' /etc/xrdp/xrdp.ini
 # use rdp security.
 sed -i_orig -e 's/security_layer=negotiate/security_layer=rdp/g' /etc/xrdp/xrdp.ini
 # remove encryption validation.
@@ -54,19 +54,21 @@ sed -i_orig -e 's/crypt_level=high/crypt_level=none/g' /etc/xrdp/xrdp.ini
 # disable bitmap compression since its local its much faster
 sed -i_orig -e 's/bitmap_compression=true/bitmap_compression=false/g' /etc/xrdp/xrdp.ini
 
-# Add script to setup the ubuntu session properly
-if [ ! -e /etc/xrdp/startubuntu.sh ]; then
-cat >> /etc/xrdp/startubuntu.sh << EOF
+# Add script to setup the kubuntu session properly
+if [ ! -e /etc/xrdp/startkubuntu.sh ]; then
+cat >> /etc/xrdp/startkubuntu.sh << EOF
 #!/bin/sh
-export GNOME_SHELL_SESSION_MODE=ubuntu
-export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+export XDG_CURRENT_DESKTOP=KDE
+export XDG_SESSION_DESKTOP=KDE
+export XDG_DATA_DIRS=/usr/share/plasma:/usr/local/share:/usr/share:/var/lib/snapd/desktop
+export XDG_CONFIG_DIRS=/etc/xdg/xdg-plasma:/etc/xdg:/usr/share/kubuntu-default-settings/kf5-settings
 exec /etc/xrdp/startwm.sh
 EOF
-chmod a+x /etc/xrdp/startubuntu.sh
+chmod a+x /etc/xrdp/startkubuntu.sh
 fi
 
-# use the script to setup the ubuntu session
-sed -i_orig -e 's/startwm/startubuntu/g' /etc/xrdp/sesman.ini
+# use the script to setup the kubuntu session
+sed -i_orig -e 's/startwm/startkubuntu/g' /etc/xrdp/sesman.ini
 
 # rename the redirected drives to 'shared-drives'
 sed -i -e 's/FuseMountName=thinclient_drives/FuseMountName=shared-drives/g' /etc/xrdp/sesman.ini
@@ -81,18 +83,23 @@ blacklist vmw_vsock_vmci_transport
 EOF
 fi
 
-#Ensure hv_sock gets loaded
+# Ensure hv_sock gets loaded
 if [ ! -e /etc/modules-load.d/hv_sock.conf ]; then
 echo "hv_sock" > /etc/modules-load.d/hv_sock.conf
 fi
 
-# Configure the policy xrdp session
-cat > /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla <<EOF
-[Allow Colord all Users]
-Identity=unix-user:*
-Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
-ResultAny=no
-ResultInactive=no
+# Retrieve all available polkit actions and separate them accordingly
+pkaction > /tmp/available_actions
+actions=$(sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/;/g' /tmp/available_actions)
+rm /tmp/available_actions
+
+# Configure the policies for xrdp session
+cat > /etc/polkit-1/localauthority/50-local.d/xrdp-allow-all.pkla <<EOF
+[Allow all for all sudoers]
+Identity=unix-group:sudo
+Action=$actions
+ResultAny=yes
+ResultInactive=yes
 ResultActive=yes
 EOF
 

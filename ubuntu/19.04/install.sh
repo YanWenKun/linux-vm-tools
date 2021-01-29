@@ -8,12 +8,6 @@
 #
 
 ###############################################################################
-# Use HWE kernel packages
-#
-HWE=""
-#HWE="-hwe-18.04"
-
-###############################################################################
 # Update our machine to the latest code if we need to.
 #
 
@@ -35,11 +29,11 @@ fi
 #
 
 # Install hv_kvp utils
-apt install -y linux-tools-virtual${HWE}
-apt install -y linux-cloud-tools-virtual${HWE}
+apt install -y linux-tools-virtual
+apt install -y linux-cloud-tools-virtual
 
 # Install the xrdp service so we have the auto start behavior
-apt install -y xrdp xserver-xorg-core xorgxrdp
+apt install -y xrdp
 
 systemctl stop xrdp
 systemctl stop xrdp-sesman
@@ -102,6 +96,17 @@ systemctl start xrdp
 
 #
 # End XRDP
+###############################################################################
+
+###############################################################################
+# GDM (added code)
+#
+
+# Stop to use wayland.
+sed -i_orig -e 's/#WaylandEnable=false/WaylandEnable=false/g' /etc/gdm3/custom.conf
+
+#
+# End GDM
 ###############################################################################
 
 echo "Install is complete."
